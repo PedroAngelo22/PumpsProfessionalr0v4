@@ -4,6 +4,7 @@ graphviz
 matplotlib
 numpy
 pandas
+Pillow
 pyyaml
 scipy
 streamlit

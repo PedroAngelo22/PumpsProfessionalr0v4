@@ -11,6 +11,7 @@ import yaml
 from yaml.loader import SafeLoader
 import streamlit_authenticator as stauth
 
+# Importando as funções do banco de dados e do gerador de relatórios
 from database import (
     setup_database, save_scenario, load_scenario, get_user_projects, 
     get_scenarios_for_project, delete_scenario, add_user_fluid, get_user_fluids, 
@@ -18,7 +19,6 @@ from database import (
 )
 from report_generator import generate_report
 
-# ... (Todo o restante do código, desde as constantes até o início do bloco 'try...except' principal, permanece igual) ...
 # --- CONFIGURAÇÕES E CONSTANTES ---
 st.set_page_config(layout="wide", page_title="Análise de Redes Hidráulicas")
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -223,7 +223,6 @@ if st.session_state.get("authentication_status"):
     name = st.session_state['name']
     username = st.session_state['username']
     
-    # Inicialização do estado da sessão
     if 'trechos_antes' not in st.session_state: st.session_state.trechos_antes = []
     if 'trechos_depois' not in st.session_state: st.session_state.trechos_depois = []
     if 'ramais_paralelos' not in st.session_state: st.session_state.ramais_paralelos = {}
@@ -234,13 +233,11 @@ if st.session_state.get("authentication_status"):
     if 'fluido_selecionado' not in st.session_state: st.session_state.fluido_selecionado = "Água a 20°C"
     if 'h_geometrica' not in st.session_state: st.session_state.h_geometrica = 15.0
 
-    # --- COMBINA BIBLIOTECAS PADRÃO E CUSTOMIZADA ---
     user_fluids = get_user_fluids(username)
     fluidos_combinados = {**FLUIDOS_PADRAO, **user_fluids}
     user_materials = get_user_materials(username)
     materiais_combinados = {**MATERIAIS_PADRAO, **user_materials}
     
-    # --- SIDEBAR ---
     with st.sidebar:
         st.header(f"Bem-vindo(a), {name}!")
         st.divider()
@@ -249,10 +246,11 @@ if st.session_state.get("authentication_status"):
         user_projects = get_user_projects(username)
         project_idx = 0
         if st.session_state.get('project_to_select') in user_projects:
-            project_idx = user_projects.index(st.session_state['project_to_select'])
+            project_idx = user_projects.index(st.session_state.get('project_to_select'))
             del st.session_state['project_to_select']
         elif st.session_state.get('selected_project') in user_projects:
-             project_idx = user_projects.index(st.session_state.get('selected_project'))
+            project_idx = user_projects.index(st.session_state.get('selected_project'))
+        
         st.selectbox("Selecione o Projeto", user_projects, index=project_idx, key="selected_project", placeholder="Nenhum projeto encontrado")
 
         scenarios = []
@@ -260,10 +258,11 @@ if st.session_state.get("authentication_status"):
         if st.session_state.get("selected_project"):
             scenarios = get_scenarios_for_project(username, st.session_state.selected_project)
             if st.session_state.get('scenario_to_select') in scenarios:
-                scenario_idx = scenarios.index(st.session_state['scenario_to_select'])
+                scenario_idx = scenarios.index(st.session_state.get('scenario_to_select'))
                 del st.session_state['scenario_to_select']
             elif st.session_state.get('selected_scenario') in scenarios:
                 scenario_idx = scenarios.index(st.session_state.get('selected_scenario'))
+
         st.selectbox("Selecione o Cenário", scenarios, index=scenario_idx, key="selected_scenario", placeholder="Nenhum cenário encontrado")
         
         col1, col2 = st.columns(2)
@@ -433,26 +432,25 @@ if st.session_state.get("authentication_status"):
             c4.metric("Custo Anual", f"R$ {resultados_energia['custo_anual']:.2f}")
             st.divider()
 
-            fig_curvas, ax_curvas = plt.subplots(figsize=(10, 6))
+            fig_curvas, ax_curvas = plt.subplots(figsize=(8.5, 5.5)) # Tamanho otimizado para PDF
+            
+            # ALTERAÇÃO 1: Restaurando a legenda detalhada do ponto de operação
+            label_ponto_op = f'Ponto de Operação ({vazao_op:.1f} m³/h, {altura_op:.1f} m)'
+            
             max_vazao_curva = st.session_state.curva_altura_df['Vazão (m³/h)'].max()
             max_plot_vazao = max(vazao_op * 1.2, max_vazao_curva * 1.2) 
             vazao_range = np.linspace(0, max_plot_vazao, 100)
             altura_bomba = func_curva_bomba(vazao_range)
             altura_sistema = [func_curva_sistema(q) if func_curva_sistema(q) < 1e10 else np.nan for q in vazao_range]
-            
-            # ALTERAÇÃO 1: Restaurando a legenda detalhada do ponto de operação
-            label_ponto_op = f'Ponto de Operação ({vazao_op:.1f} m³/h, {altura_op:.1f} m)'
-            ax_curvas.scatter(vazao_op, altura_op, color='red', s=100, zorder=5, label=label_ponto_op)
-            
             ax_curvas.plot(vazao_range, altura_bomba, label='Curva da Bomba', color='royalblue', lw=2)
             ax_curvas.plot(vazao_range, altura_sistema, label='Curva do Sistema', color='seagreen', lw=2)
+            ax_curvas.scatter(vazao_op, altura_op, color='red', s=100, zorder=5, label=label_ponto_op)
             ax_curvas.set_title("Curva da Bomba vs. Curva do Sistema")
             ax_curvas.set_xlabel("Vazão (m³/h)")
             ax_curvas.set_ylabel("Altura Manométrica (m)")
             ax_curvas.legend()
             ax_curvas.grid(True)
             
-            # Lógica de exportação e exibição de gráficos
             st.header("📄 Exportar Relatório")
             params_data = {
                 "Fluido Selecionado": st.session_state.fluido_selecionado,
@@ -475,9 +473,8 @@ if st.session_state.get("authentication_status"):
             diagrama_obj = gerar_diagrama_rede(sistema_atual, vazao_op, distribuicao_vazao_op if len(sistema_atual['paralelo']) >= 2 else {}, st.session_state.fluido_selecionado, materiais_combinados, fluidos_combinados)
             diagrama_bytes = diagrama_obj.pipe(format='png')
 
-            # Salva o gráfico em um buffer de bytes para o relatório
             chart_buffer = io.BytesIO()
-            fig_curvas.savefig(chart_buffer, format='PNG', dpi=300)
+            fig_curvas.savefig(chart_buffer, format='PNG', dpi=300, bbox_inches='tight')
             chart_buffer.seek(0)
 
             pdf_bytes = generate_report(
@@ -488,7 +485,7 @@ if st.session_state.get("authentication_status"):
                 metrics_data=metrics_data,
                 network_data=sistema_atual,
                 diagram_image_bytes=diagrama_bytes,
-                chart_figure=chart_buffer.getvalue() # Passa os bytes do gráfico
+                chart_figure_bytes=chart_buffer.getvalue()
             )
             st.download_button(
                 label="📥 Baixar Relatório em PDF",

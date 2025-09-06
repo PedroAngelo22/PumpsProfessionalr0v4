@@ -1,9 +1,10 @@
-# report_generator.py (Versão 2.2 - Correção da imagem do gráfico)
+# report_generator.py (Versão 2.3 - Correção do import 'time')
 
+import time # LINHA ADICIONADA
 from fpdf import FPDF
 from datetime import datetime
 import io
-from PIL import Image # Garante que a dependência seja clara
+from PIL import Image
 import os
 
 class PDFReport(FPDF):
@@ -195,7 +196,6 @@ def generate_report(project_name, scenario_name, params_data, results_data, metr
     pdf.add_key_value_table(results_data)
 
     pdf.add_section_title('Gráfico: Curva da Bomba vs. Curva do Sistema')
-    # CORREÇÃO FINAL: Usando a variável correta para os bytes do gráfico
     pdf.add_image_from_bytes(chart_figure_bytes)
     
     return bytes(pdf.output())
